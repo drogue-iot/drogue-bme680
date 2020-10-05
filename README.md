@@ -1,4 +1,4 @@
-# Drogue BME680 Sensor implementation
+# Drogue IoT BME680 Sensor driver
 
 [![CI](https://github.com/drogue-iot/drogue-bme680/workflows/CI/badge.svg)](https://github.com/drogue-iot/drogue-bme680/actions?query=workflow%3A%22CI%22)
 [![crates.io](https://img.shields.io/crates/v/drogue-bme680.svg)](https://crates.io/crates/drogue-bme680)
