@@ -319,10 +319,10 @@ where
                     }
                     return Ok(Some(result.0));
                 }
-                Ok(result) => {
+                Ok(_result) => {
                     #[cfg(feature = "dump")]
                     {
-                        log::info!("State: {:?}", result.1);
+                        log::info!("State: {:?}", _result.1);
                     }
                     {
                         cnt -= 1;
