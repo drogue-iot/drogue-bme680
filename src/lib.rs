@@ -38,7 +38,7 @@
 //!
 //! # Known limitations
 //!
-//! * Currently, the crate only provide access to the sensor using I2C.
+//! * Currently, the crate only provides access to the sensor using I2C.
 
 mod control;
 mod data;
