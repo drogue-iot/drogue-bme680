@@ -36,4 +36,4 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --feature logging,dump,stm32f7xx
+          args: --features logging,dump,stm32f7xx
