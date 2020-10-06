@@ -1,8 +1,8 @@
-#![deny(unsafe_code)]
+// #![deny(unsafe_code)]
 #![no_main]
 #![no_std]
 
-/// Example for using the BME680 sensor on an STM32F723 DISCOVERY board
+/// Example for using the BME680 sensor on an STM32F723E DISCOVERY board
 
 #[cfg(not(feature = "env_logging"))]
 use panic_rtt_target as _;
@@ -13,24 +13,20 @@ use cortex_m_rt::entry;
 #[cfg(feature = "stm32f7xx")]
 use stm32f7 as _;
 #[cfg(feature = "stm32f7xx")]
-use stm32f7xx_hal as hal;
-#[cfg(feature = "stm32f7xx")]
 use stm32f7xx_hal::{
-    delay::Delay,
     device,
     i2c::{BlockingI2c, Mode},
     prelude::*,
-    timer::Timer,
 };
 
-use drogue_bme680::{Address, Bme680Controller, Bme680Sensor, Configuration};
-use drogue_embedded_timer::embedded_countdown;
+use drogue_bme680::{
+    Address, Bme680Controller, Bme680Sensor, Configuration, DelayMsWrapper, StaticProvider,
+};
 
 use log::LevelFilter;
 use rtt_logger::RTTLogger;
 
-use embedded_hal::timer::CountDown;
-use embedded_time::duration::{Duration, Milliseconds};
+use embedded_time::duration::Milliseconds;
 
 static LOGGER: RTTLogger = RTTLogger::new(LevelFilter::Info);
 
@@ -42,12 +38,11 @@ fn main() -> ! {
     log::info!("Starting up...");
 
     let p = device::Peripherals::take().unwrap();
+    let cp = cortex_m::Peripherals::take().unwrap();
 
     let mut rcc = p.RCC.constrain();
 
     let clocks = rcc.cfgr.sysclk(216.mhz()).freeze();
-    let core = device::CorePeripherals::take().unwrap();
-    let mut delay = Delay::new(core.SYST, clocks);
 
     // let gpioa = p.GPIOA.split();
     // let gpiob = p.GPIOB.split();
@@ -57,18 +52,10 @@ fn main() -> ! {
     let gpioh = p.GPIOH.split();
     // let gpioi = p.GPIOI.split();
 
-    // timer
+    // delay implementation
 
-    embedded_countdown!(MsToHertzCountDown,
-                embedded_time::duration::Milliseconds,
-                hal::time::Hertz
-                 => (ms) {
-                        let hz: embedded_time::rate::Hertz = ms.to_rate().unwrap();
-                        hal::time::Hertz(hz.0)
-                } );
-
-    let hal_hz_timer = Timer::tim14(p.TIM14, 1.hz(), clocks, &mut rcc.apb1);
-    let mut timer = MsToHertzCountDown::from(hal_hz_timer);
+    let delay = stm32f7xx_hal::delay::Delay::new(cp.SYST, clocks);
+    let delay = DelayMsWrapper::new(delay);
 
     // init
 
@@ -89,7 +76,8 @@ fn main() -> ! {
     let bme680 = Bme680Sensor::from(i2c, Address::Secondary).unwrap();
 
     let mut controller =
-        Bme680Controller::new(bme680, &mut timer, Configuration::standard(), || 25).unwrap();
+        Bme680Controller::new(bme680, delay, Configuration::standard(), StaticProvider(25))
+            .unwrap();
 
     let mut cnt = 0;
 
@@ -108,7 +96,6 @@ fn main() -> ! {
             cnt = 0;
         }
 
-        // delay(&mut timer, Milliseconds(1_000));
-        delay.delay_ms(1_000u16);
+        controller.delay(1_000u16);
     }
 }

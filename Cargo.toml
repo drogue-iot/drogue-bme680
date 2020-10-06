@@ -3,27 +3,26 @@ authors = ["Jens Reimann <jreimann@redhat.com>"]
 edition = "2018"
 readme = "README.md"
 name = "drogue-bme680"
-version = "0.1.0"
+version = "0.2.0"
 license = "BSD-3-Clause"
 description = "A crate to interface with the BME680 environmental sensor"
 repository = "https://github.com/drogue-iot/drogue-bme680"
 homepage = "https://blog.drogue.io"
 categories = ["embedded", "no-std"]
+keywords = ["bme680"]
 
 [dependencies]
 
 embedded-hal = "0.2"
 embedded-time = "0.10"
 
-nb = "1"
+drogue-embedded-timer = "0.2"
 
 log = "0.4"
 
 bitfield = "0.13"
 
 env_logger = { version = "0.7", optional = true }
-
-void = { version = "1", default-features = false }
 
 [features]
 dump = []
@@ -32,8 +31,6 @@ stm32f7xx = []
 
 [dev-dependencies]
 
-drogue-embedded-timer = "0.1"
-
 rtt-target = { version = "0.2.1", features = ["cortex-m"] }
 panic-rtt-target = { version = "0.1.1", features = ["cortex-m"] }
 rtt-logger = { version = "0.1" }
@@ -41,7 +38,7 @@ rtt-logger = { version = "0.1" }
 cortex-m = { version = "0.6" }
 cortex-m-rt = { version = "0.6" }
 stm32f7 = { version = "0.11", features = ["stm32f7x3", "rt"] }
-stm32f7xx-hal = { version = "0.2", features = ["stm32f723"] }
+stm32f7xx-hal = { version = "0.2", features = ["stm32f723", "rt"] }
 
 [profile.release]
 codegen-units = 1 # better optimizations

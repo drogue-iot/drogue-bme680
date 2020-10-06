@@ -1,12 +1,10 @@
 use crate::data::*;
-use crate::{calc_profile_duration, Error};
+use crate::{calc_profile_duration, ControllerError, Delay};
 use crate::{Bme680Sensor, BME680_CALIB_SIZE};
 
 use embedded_hal::blocking::i2c::{Write, WriteRead};
-use embedded_hal::timer::CountDown;
 
 use embedded_time::duration::Milliseconds;
-use nb::block;
 
 /// Processes measurement data.
 #[derive(Copy, Clone, Debug)]
@@ -17,23 +15,46 @@ pub struct Data {
     pub gas_resistance: f32,
 }
 
+pub trait AmbientTemperatureProvider {
+    type Error;
+
+    fn get(&mut self) -> Result<i8, Self::Error>;
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct StaticProvider(pub i8);
+
+#[derive(Copy, Clone, Debug)]
+pub enum StaticProviderError {}
+
+impl AmbientTemperatureProvider for StaticProvider {
+    type Error = StaticProviderError;
+
+    fn get(&mut self) -> Result<i8, Self::Error> {
+        Ok(self.0)
+    }
+}
+
 /// Controller for taking measurements with the sensor.
 ///
 /// Compared to [`Bme680Sensor`], this controller proceeds through the necessary setup and
 /// measurement steps.
-pub struct Bme680Controller<'clock, I2C, T, C, ATP>
+pub struct Bme680Controller<I2C, D, ATP>
 where
     I2C: WriteRead + Write,
     <I2C as WriteRead>::Error: core::fmt::Debug,
     <I2C as Write>::Error: core::fmt::Debug,
-    T: From<Milliseconds>,
-    C: CountDown<Time = T>,
-    ATP: Fn() -> i8,
+    ATP: AmbientTemperatureProvider,
+    ATP::Error: core::fmt::Debug,
+    D: Delay + Sized,
 {
+    delay: D,
+
     sensor: Bme680Sensor<I2C>,
+
     calibration: CalibrationInformation<[u8; BME680_CALIB_SIZE]>,
     config: Configuration,
-    timer: &'clock mut C,
+
     ambient_temperature_provider: ATP,
     profile_duration: u32,
 }
@@ -72,21 +93,21 @@ impl Configuration {
     }
 }
 
-impl<'clock, I2C, T, C, ATP> Bme680Controller<'clock, I2C, T, C, ATP>
+impl<I2C, D, ATP> Bme680Controller<I2C, D, ATP>
 where
     I2C: WriteRead + Write,
     <I2C as WriteRead>::Error: core::fmt::Debug,
     <I2C as Write>::Error: core::fmt::Debug,
-    T: From<Milliseconds>,
-    C: CountDown<Time = T>,
-    ATP: Fn() -> i8,
+    D: Delay,
+    ATP: AmbientTemperatureProvider,
+    ATP::Error: core::fmt::Debug,
 {
     /// Create a new instance of a controller.
     ///
     /// # Arguments
     ///
     /// * `sensor` the sensor this controller wil use. It will take ownership of the sensor.
-    /// * `timer` a timer which will be used for waiting.
+    /// * `clock` a clock which will be used for creating timers.
     /// * `config` the configuration of the controller.
     /// * `ambient_temperature_provider` a provider for the ambient temperature (in degrees Celsius).
     ///
@@ -94,10 +115,10 @@ where
     /// measurements. Or simply by using some reasonable default value, like 20 °C.
     pub fn new(
         mut sensor: Bme680Sensor<I2C>,
-        timer: &'clock mut C,
+        delay: D,
         config: Configuration,
         ambient_temperature_provider: ATP,
-    ) -> Result<Self, Error<I2C>> {
+    ) -> Result<Self, ControllerError<I2C, ATP>> {
         let calibration = sensor.get_calibration_data()?;
         #[cfg(feature = "dump")]
         {
@@ -147,17 +168,22 @@ where
             sensor,
             calibration,
             config,
-            timer,
+            delay,
             ambient_temperature_provider,
             profile_duration,
         }
         .init()
     }
 
-    fn init(mut self) -> Result<Self, Error<I2C>> {
+    /// Pause execution for `duration_ms` milliseconds.
+    pub fn delay(&self, duration_ms: u16) {
+        self.delay.delay_ms(duration_ms)
+    }
+
+    fn init(mut self) -> Result<Self, ControllerError<I2C, ATP>> {
         // perform a soft reset
         self.sensor.soft_reset()?;
-        self.delay(Milliseconds(10));
+        self.delay(10);
 
         // send to sleep
         self.send_to_sleep()?;
@@ -204,37 +230,30 @@ where
         Ok(self)
     }
 
-    fn delay<D>(&mut self, duration: D)
-    where
-        D: Into<T>,
-    {
-        self.timer.start(duration.into());
-        block!(self.timer.wait()).ok();
-    }
-
-    fn send_to_sleep(&mut self) -> Result<(), Error<I2C>> {
+    fn send_to_sleep(&mut self) -> Result<(), ControllerError<I2C, ATP>> {
         while self.sensor.get_power_mode()? != Mode::Sleep {
             self.sensor.set_power_mode(Mode::Sleep)?;
-            self.delay(Milliseconds(10));
+            self.delay(10);
         }
 
         Ok(())
     }
 
-    pub fn power_mode(&mut self) -> Result<Mode, Error<I2C>> {
+    pub fn power_mode(&mut self) -> Result<Mode, ControllerError<I2C, ATP>> {
         let cfg = self.sensor.get_control_measurement()?;
         Ok(cfg.mode())
     }
 
-    fn calc_heater_res(&mut self, temperature: u16) -> u8 {
+    fn calc_heater_res(&mut self, temperature: u16) -> Result<u8, ControllerError<I2C, ATP>> {
         // FIXME: blocked by: https://github.com/dzamlo/rust-bitfield/issues/29
         let mut calib = CalibrationInformation(&mut self.calibration.0[..]);
 
-        calc_heater_res(
-            &mut calib,
-            (self.ambient_temperature_provider)(),
-            temperature,
-        )
+        let amb = self
+            .ambient_temperature_provider
+            .get()
+            .map_err(|e| ControllerError::ProviderError(e))?;
+
+        Ok(calc_heater_res(&mut calib, amb, temperature))
     }
 
     /// Set the configuration for the gas sensor.
@@ -244,8 +263,12 @@ where
     /// * `temperature` - temperature in degree Celsius
     /// * `duration` - duration in milliseconds
     ///
-    fn set_gas_config(&mut self, temperature: u16, duration: u16) -> Result<(), Error<I2C>> {
-        let resistance = self.calc_heater_res(temperature);
+    fn set_gas_config(
+        &mut self,
+        temperature: u16,
+        duration: u16,
+    ) -> Result<(), ControllerError<I2C, ATP>> {
+        let resistance = self.calc_heater_res(temperature)?;
         let gas_wait = GasWaitTime::from(duration);
 
         #[cfg(feature = "dump")]
@@ -263,7 +286,7 @@ where
         self.profile_duration
     }
 
-    fn read_data(&mut self) -> Result<(Data, State), Error<I2C>> {
+    fn read_data(&mut self) -> Result<(Data, State), ControllerError<I2C, ATP>> {
         let data = self.sensor.read_raw_sensor_data()?;
 
         // FIXME: blocked by: https://github.com/dzamlo/rust-bitfield/issues/29
@@ -278,7 +301,7 @@ where
     ///   * Set the power mode to "forced".
     ///   * Wait until the measurement is expected to be complete.
     ///   * Read the data until the "new data" flag is detected.
-    pub fn measure_default(&mut self) -> Result<Option<Data>, Error<I2C>> {
+    pub fn measure_default(&mut self) -> Result<Option<Data>, ControllerError<I2C, ATP>> {
         self.measure(5, Milliseconds(10))
     }
 
@@ -292,7 +315,7 @@ where
         &mut self,
         retries: u8,
         delay: Milliseconds,
-    ) -> Result<Option<Data>, Error<I2C>> {
+    ) -> Result<Option<Data>, ControllerError<I2C, ATP>> {
         self.sensor.set_power_mode(Mode::Forced)?;
 
         #[cfg(feature = "dump")]
@@ -305,10 +328,17 @@ where
             );
         }
 
+        // in "dump" mode, we don't initially wait, but log the internal state more often
         #[cfg(not(feature = "dump"))]
-        self.delay(Milliseconds(self.profile_duration));
+        self.delay(self.profile_duration as u16);
 
-        let mut cnt = retries;
+        let mut cnt = retries as u16;
+
+        #[cfg(feature = "dump")]
+        {
+            // in dump mode we add some re-tries to compensate for skipping the initial wait
+            cnt += (self.profile_duration / delay.0) as u16 + 1;
+        }
 
         loop {
             match self.read_data() {
@@ -326,7 +356,7 @@ where
                     }
                     {
                         cnt -= 1;
-                        self.delay(delay);
+                        self.delay(delay.0 as u16);
                     }
                 }
                 Err(e) => {

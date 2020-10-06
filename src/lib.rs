@@ -15,18 +15,19 @@
 //!
 //! ~~~no_run
 //! use drogue_bme680::*;
+//! use drogue_embedded_timer::*;
 //!
 //! fn main() -> ! {
 //!   let i2c = mock::blocking_i2c();
-//!   let mut timer = mock::create_timer();
 //!
 //!   let bme680 = Bme680Sensor::from(i2c, Address::Secondary).unwrap();
+//!   let delay = mock::MockDelay;
 //!
 //!   let mut controller = Bme680Controller::new(
 //!     bme680,
-//!     &mut timer,
+//!     delay,
 //!     Configuration::standard(),
-//!     || 25,  // fixed 25 degrees Celsius ambient temperature
+//!     StaticProvider(25),
 //!   ).unwrap();
 //!   
 //!   loop {
@@ -42,6 +43,7 @@
 
 mod control;
 mod data;
+mod delay;
 mod error;
 #[doc(hidden)]
 pub mod mock;
@@ -49,6 +51,7 @@ mod sensor;
 
 pub use control::*;
 pub use data::*;
+pub use delay::*;
 pub use error::*;
 pub use sensor::*;
 
