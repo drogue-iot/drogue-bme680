@@ -73,13 +73,10 @@ fn main() -> ! {
     #[cfg(feature = "stm32f7xx")]
     let clocks = rcc.cfgr.sysclk(216.mhz()).freeze();
 
-    // let gpioa = p.GPIOA.split();
-    let gpiob = p.GPIOB.split();
-    // let gpioc = p.GPIOC.split();
-    // let gpiod = p.GPIOD.split();
-    // let gpiog = p.GPIOG.split();
-    let gpioh = p.GPIOH.split();
-    // let gpioi = p.GPIOI.split();
+    #[cfg(feature = "stm32f4xx")]
+    let gpiob = device.GPIOB.split();
+    #[cfg(feature = "stm32f7xx")]
+    let gpioh = device.GPIOH.split();
 
     // delay implementation
 

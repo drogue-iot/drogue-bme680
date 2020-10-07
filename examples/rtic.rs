@@ -114,10 +114,6 @@ const APP: () = {
 
         let device: device::Peripherals = cx.device;
 
-        // semantically, the monotonic timer is frozen at time "zero" during `init`
-        // NOTE do *not* call `Instant::now` in this context; it will return a nonsense value
-        // let now = cx.start; // the start time of the system
-
         // init sensor
 
         #[cfg(feature = "stm32f4xx")]
@@ -130,13 +126,10 @@ const APP: () = {
         #[cfg(feature = "stm32f7xx")]
         let clocks = rcc.cfgr.sysclk(216.mhz()).freeze();
 
-        // let gpioa = p.GPIOA.split();
+        #[cfg(feature = "stm32f4xx")]
         let gpiob = device.GPIOB.split();
-        // let gpioc = p.GPIOC.split();
-        // let gpiod = p.GPIOD.split();
-        // let gpiog = p.GPIOG.split();
+        #[cfg(feature = "stm32f7xx")]
         let gpioh = device.GPIOH.split();
-        // let gpioi = p.GPIOI.split();
 
         // init
 
