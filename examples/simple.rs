@@ -1,23 +1,46 @@
-// #![deny(unsafe_code)]
+#![deny(unsafe_code)]
 #![no_main]
 #![no_std]
 
-/// Example for using the BME680 sensor on an STM32F723E DISCOVERY board
+//! Example for using the BME680 sensor.
+//!
+//! ## STM32F411RE - Nucleo 64
+//!
+//! Connect the BME680 sensor to the I2C port #1 using pins PB8/PB9.
+//!
+//! ## STM32F723E - DISCOVERY
+//!
+//! Connect the BME680 to the STM32F723E DISCOVERY board via the Grove I2C connector
+//! on the extension board.
 
 #[cfg(not(feature = "env_logging"))]
 use panic_rtt_target as _;
 use rtt_target::rtt_init_print;
 
-#[cfg(feature = "stm32f7xx")]
+#[cfg(any(feature = "stm32f7xx", feature = "stm32f4xx"))]
 use cortex_m_rt::entry;
+
+#[cfg(feature = "stm32f4xx")]
+use stm32f4 as _;
+#[cfg(feature = "stm32f4xx")]
+use stm32f4xx_hal as hal;
+#[cfg(feature = "stm32f4xx")]
+use stm32f4xx_hal::stm32::Peripherals as DevicePeripherals;
+
+#[cfg(feature = "stm32f4xx")]
+use hal::i2c::I2c;
+
 #[cfg(feature = "stm32f7xx")]
 use stm32f7 as _;
 #[cfg(feature = "stm32f7xx")]
-use stm32f7xx_hal::{
-    device,
-    i2c::{BlockingI2c, Mode},
-    prelude::*,
-};
+use stm32f7xx_hal as hal;
+#[cfg(feature = "stm32f7xx")]
+use stm32f7xx_hal::device::Peripherals as DevicePeripherals;
+
+#[cfg(feature = "stm32f7xx")]
+use hal::i2c::{BlockingI2c, Mode};
+
+use hal::{delay::Delay, gpio::GpioExt, rcc::RccExt, time::U32Ext};
 
 use drogue_bme680::{
     Address, Bme680Controller, Bme680Sensor, Configuration, DelayMsWrapper, StaticProvider,
@@ -37,15 +60,18 @@ fn main() -> ! {
     log::set_max_level(log::LevelFilter::Trace);
     log::info!("Starting up...");
 
-    let p = device::Peripherals::take().unwrap();
+    let p = DevicePeripherals::take().unwrap();
     let cp = cortex_m::Peripherals::take().unwrap();
 
     let mut rcc = p.RCC.constrain();
 
+    #[cfg(feature = "stm32f4xx")]
+    let clocks = rcc.cfgr.sysclk(50.mhz()).freeze();
+    #[cfg(feature = "stm32f7xx")]
     let clocks = rcc.cfgr.sysclk(216.mhz()).freeze();
 
     // let gpioa = p.GPIOA.split();
-    // let gpiob = p.GPIOB.split();
+    let gpiob = p.GPIOB.split();
     // let gpioc = p.GPIOC.split();
     // let gpiod = p.GPIOD.split();
     // let gpiog = p.GPIOG.split();
@@ -54,16 +80,29 @@ fn main() -> ! {
 
     // delay implementation
 
-    let delay = stm32f7xx_hal::delay::Delay::new(cp.SYST, clocks);
+    let delay = Delay::new(cp.SYST, clocks);
     let delay = DelayMsWrapper::new(delay);
 
     // init
 
-    let sda = gpioh.ph5.into_alternate_af4();
-    let scl = gpioh.ph4.into_alternate_af4();
+    #[cfg(feature = "stm32f4xx")]
+    let (sda, scl) = {
+        let sda = gpiob.pb9.into_alternate_af4_open_drain();
+        let scl = gpiob.pb8.into_alternate_af4_open_drain();
+        (sda, scl)
+    };
+    #[cfg(feature = "stm32f7xx")]
+    let (sda, scl) = {
+        let sda = gpioh.ph5.into_alternate_af4();
+        let scl = gpioh.ph4.into_alternate_af4();
+        (sda, scl)
+    };
 
     // Initialize I2C
 
+    #[cfg(feature = "stm32f4xx")]
+    let i2c = I2c::i2c1(p.I2C1, (scl, sda), 100.khz(), clocks);
+    #[cfg(feature = "stm32f7xx")]
     let i2c = BlockingI2c::i2c2(
         p.I2C2,
         (scl, sda),
@@ -82,9 +121,6 @@ fn main() -> ! {
     let mut cnt = 0;
 
     loop {
-        // log::info!("{:?}", controller.state().unwrap());
-        // log::info!("{:?}", controller.read_data().unwrap());
-
         if cnt == 0 {
             log::info!(
                 "Measured: {:?}",

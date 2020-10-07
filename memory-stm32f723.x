@@ -1,8 +1,9 @@
+/* For STM32F722,723,732,733 devices */
 MEMORY
 {
   /* NOTE K = KiBi = 1024 bytes */
-  FLASH : ORIGIN = 0x08000000, LENGTH = 64K
-  RAM : ORIGIN = 0x20000000, LENGTH = 32K
+  FLASH : ORIGIN = 0x08000000, LENGTH = 512K
+  RAM : ORIGIN = 0x20000000, LENGTH = 176K + 16K
 }
 
 /* This is where the call stack will be allocated. */

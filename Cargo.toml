@@ -24,21 +24,28 @@ bitfield = "0.13"
 
 env_logger = { version = "0.7", optional = true }
 
+stm32f4 = { version = "0.11", features = ["stm32f411", "rt"], optional = true }
+stm32f4xx-hal = { version = "0.8", features = ["stm32f411", "rt"], optional = true }
+stm32f7 = { version = "0.11", features = ["stm32f7x3", "rt"], optional = true }
+stm32f7xx-hal = { version = "0.2", features = ["stm32f723", "rt"], optional = true }
+
 [features]
+
 dump = []
 env_logging = ["env_logger"]
-stm32f7xx = []
+stm32f4xx = ["stm32f4", "stm32f4xx-hal"]
+stm32f7xx = ["stm32f7", "stm32f7xx-hal"]
 
 [dev-dependencies]
 
 rtt-target = { version = "0.2.1", features = ["cortex-m"] }
 panic-rtt-target = { version = "0.1.1", features = ["cortex-m"] }
+panic-halt = "0.2.0"
 rtt-logger = { version = "0.1" }
 
 cortex-m = { version = "0.6" }
 cortex-m-rt = { version = "0.6" }
-stm32f7 = { version = "0.11", features = ["stm32f7x3", "rt"] }
-stm32f7xx-hal = { version = "0.2", features = ["stm32f723", "rt"] }
+cortex-m-rtic = "0.5"
 
 [profile.release]
 codegen-units = 1 # better optimizations
