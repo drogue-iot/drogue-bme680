@@ -18,6 +18,14 @@ jobs:
           profile: minimal
           override: true
 
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
         with:
@@ -45,6 +53,11 @@ jobs:
       matrix:
         hal: [ "stm32f4xx", "stm32f7xx" ]
         example: [ "simple", "rtic" ]
+        include:
+          - hal: stm32f4xx
+            target: thumbv7em-none-eabihf
+          - hal: stm32f7xx
+            target: thumbv7em-none-eabihf
 
     steps:
       - uses: actions/checkout@v2
@@ -53,11 +66,19 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          components: rustfmt, clippy
           profile: minimal
           override: true
+          target: ${{ matrix.target }}
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.hal }}-${{ matrix.target }}-${{ matrix.example }}
 
       - uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release --features "${{ matrix.hal }}" --target thumbv7em-none-eabihf --example "${{ matrix.example }}"
+          args: --release --features "${{ matrix.hal }}" --target ${{ matrix.target }} --example "${{ matrix.example }}"
