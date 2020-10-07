@@ -60,4 +60,4 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release --features "${{hal}}" --target thumbv7em-none-eabihf --example "${{example}}"
+          args: --release --features "${{ matrix.hal }}" --target thumbv7em-none-eabihf --example "${{ matrix.example }}"
