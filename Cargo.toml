@@ -40,7 +40,6 @@ stm32f7xx = ["stm32f7", "stm32f7xx-hal"]
 
 rtt-target = { version = "0.2.1", features = ["cortex-m"] }
 panic-rtt-target = { version = "0.1.1", features = ["cortex-m"] }
-panic-halt = "0.2.0"
 rtt-logger = { version = "0.1" }
 
 cortex-m = { version = "0.6" }
