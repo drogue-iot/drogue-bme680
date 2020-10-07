@@ -49,9 +49,7 @@ use hal::{gpio::GpioExt, gpio::AF4, rcc::RccExt, time::U32Ext};
 #[cfg(feature = "stm32f7xx")]
 use rtic::export::DWT;
 
-use drogue_bme680::{
-    Address, Bme680Sensor, CalibrationInformation, Configuration, DelayMsWrapper, StaticProvider,
-};
+use drogue_bme680::{Address, Bme680Sensor, CalibrationInformation};
 
 use log::LevelFilter;
 use rtt_logger::RTTLogger;
@@ -123,9 +121,9 @@ const APP: () = {
         // init sensor
 
         #[cfg(feature = "stm32f4xx")]
-        let rcc = p.RCC.constrain();
+        let rcc = device.RCC.constrain();
         #[cfg(feature = "stm32f7xx")]
-        let mut rcc = p.RCC.constrain();
+        let mut rcc = device.RCC.constrain();
 
         #[cfg(feature = "stm32f4xx")]
         let clocks = rcc.cfgr.sysclk(50.mhz()).freeze();
@@ -182,11 +180,6 @@ const APP: () = {
         let mut calib = bme680.get_calibration_data().unwrap();
         log::info!("Calib: {:#?}", CalibrationInformation(&mut calib.0[..]));
 
-        /*
-                let _controller =
-                    Bme680Controller::new(bme680, delay, Configuration::standard(), StaticProvider(25))
-                        .unwrap();
-        */
         loop {
             cortex_m::asm::nop();
         }
