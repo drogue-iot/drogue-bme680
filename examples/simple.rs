@@ -63,6 +63,9 @@ fn main() -> ! {
     let p = DevicePeripherals::take().unwrap();
     let cp = cortex_m::Peripherals::take().unwrap();
 
+    #[cfg(feature = "stm32f4xx")]
+    let rcc = p.RCC.constrain();
+    #[cfg(feature = "stm32f7xx")]
     let mut rcc = p.RCC.constrain();
 
     #[cfg(feature = "stm32f4xx")]
