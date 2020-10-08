@@ -50,11 +50,11 @@ You can run the unit tests on simple host machine using:
 
 Run with (STM32F411):
 
-    cargo embed --release --feature stm32f4xx --target thumbv7em-none-eabihf --example simple
+    cargo embed --release --features stm32f4xx --target thumbv7em-none-eabihf --example simple
 
 Run with (STM32F723):
 
-    cargo embed --release --feature stm32f7xx --target thumbv7em-none-eabihf --example simple
+    cargo embed --release --features stm32f7xx --target thumbv7em-none-eabihf --example simple
 
 ## Dump data
 
