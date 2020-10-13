@@ -9,7 +9,7 @@ description = "A crate to interface with the BME680 environmental sensor"
 repository = "https://github.com/drogue-iot/drogue-bme680"
 homepage = "https://blog.drogue.io"
 categories = ["embedded", "no-std"]
-keywords = ["bme680"]
+keywords = ["driver", "bme680", "sensor", "no_std"]
 
 [dependencies]
 
