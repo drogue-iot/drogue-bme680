@@ -367,7 +367,7 @@ where
         #[cfg(feature = "dump")]
         {
             // in dump mode we add some re-tries to compensate for skipping the initial wait
-            cnt += (self.profile_duration / delay.0) as u16 + 1;
+            cnt += (self.profile_duration.0 / delay.0) as u16 + 1;
         }
 
         loop {
