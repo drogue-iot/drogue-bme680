@@ -50,6 +50,30 @@ where
     }
 }
 
+impl<D> DelayMs<u16> for DelayMsWrapper<D>
+where
+    D: DelayMs<u16> + Sized,
+{
+    fn delay_ms(&mut self, ms: u16) {
+        let delay = self.delay.take();
+        let mut delay = delay.expect("Delay instance gone missing");
+        delay.delay_ms(ms);
+        self.delay.set(Some(delay));
+    }
+}
+
+impl<D> DelayMs<u8> for DelayMsWrapper<D>
+where
+    D: DelayMs<u16> + Sized,
+{
+    fn delay_ms(&mut self, ms: u8) {
+        let delay = self.delay.take();
+        let mut delay = delay.expect("Delay instance gone missing");
+        delay.delay_ms(ms as u16);
+        self.delay.set(Some(delay));
+    }
+}
+
 #[doc(hidden)]
 pub mod mock {
     use super::Delay;

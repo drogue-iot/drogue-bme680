@@ -2,6 +2,7 @@ use embedded_hal::blocking::i2c::{Write, WriteRead};
 
 use crate::data::*;
 use crate::error::Error;
+use embedded_time::duration::Milliseconds;
 
 const BME680_SOFT_RESET_ADDR: u8 = 0xE0;
 const BME680_CHIP_ID_ADDR: u8 = 0xD0;
@@ -289,7 +290,7 @@ pub fn calc_profile_duration(
     humidity: Oversampling,
     run_gas: bool,
     gwt: GasWaitTime,
-) -> u32 {
+) -> Milliseconds {
     let mut result = 0u32;
 
     let mut meas_cycles = temperature.cycles();
@@ -308,5 +309,5 @@ pub fn calc_profile_duration(
         result += gwt.as_millis();
     }
 
-    result
+    Milliseconds(result)
 }

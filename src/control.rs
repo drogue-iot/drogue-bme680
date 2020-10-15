@@ -56,7 +56,7 @@ where
     config: Configuration,
 
     ambient_temperature_provider: ATP,
-    profile_duration: u32,
+    profile_duration: Milliseconds,
 }
 
 /// Current state.
@@ -77,6 +77,7 @@ pub struct Configuration {
     pub humidity: Oversampling,
     pub heater_temperature: u16,
     pub heater_duration: Milliseconds,
+    pub run_gas: bool,
 }
 
 impl Configuration {
@@ -89,7 +90,19 @@ impl Configuration {
             humidity: Oversampling::By2,
             heater_temperature: 300,
             heater_duration: Milliseconds(150),
+            run_gas: true,
         }
+    }
+
+    /// Calculate the profile duration of the configuration.
+    pub fn profile_duration(&self) -> Milliseconds {
+        calc_profile_duration(
+            self.temperature,
+            self.pressure,
+            self.humidity,
+            self.run_gas,
+            GasWaitTime::from(self.heater_duration.0 as u16),
+        )
     }
 }
 
@@ -156,34 +169,30 @@ where
             log::info!("range_sw_err = {:?}", calibration.range_sw_err());
         }
 
-        let profile_duration = calc_profile_duration(
-            config.temperature,
-            config.pressure,
-            config.humidity,
-            true,
-            GasWaitTime::from(config.heater_duration.0 as u16),
-        );
-
         Bme680Controller {
             sensor,
             calibration,
             config,
             delay,
             ambient_temperature_provider,
-            profile_duration,
+            profile_duration: config.profile_duration(),
         }
         .init()
     }
 
-    /// Pause execution for `duration_ms` milliseconds.
-    pub fn delay(&self, duration_ms: u16) {
-        self.delay.delay_ms(duration_ms)
-    }
-
-    fn init(mut self) -> Result<Self, ControllerError<I2C, ATP>> {
-        // perform a soft reset
-        self.sensor.soft_reset()?;
-        self.delay(10);
+    /// Update the configuration of the controller.
+    pub fn update_configuration(
+        &mut self,
+        config: Configuration,
+    ) -> Result<(), ControllerError<I2C, ATP>> {
+        self.config = config;
+        self.profile_duration = calc_profile_duration(
+            config.temperature,
+            config.pressure,
+            config.humidity,
+            true,
+            GasWaitTime::from(config.heater_duration.0 as u16),
+        );
 
         // send to sleep
         self.send_to_sleep()?;
@@ -215,7 +224,7 @@ where
         let mut gas = self.sensor.get_control_gas()?;
         // we always work with profile #0 here
         gas.set_nb_conv(HeaterProfile::Profile0);
-        gas.set_run_gas(true);
+        gas.set_run_gas(self.config.run_gas);
         self.sensor.set_control_gas(gas)?;
 
         // set config
@@ -225,6 +234,27 @@ where
             self.config.heater_duration.0 as u16,
         )?;
 
+        Ok(())
+    }
+
+    /// Pause execution for `duration` milliseconds.
+    pub fn delay(&self, duration: Milliseconds) {
+        self.delay.delay_ms(duration.0 as u16)
+    }
+
+    fn delay_ms(&self, duration_ms: u16) {
+        self.delay.delay_ms(duration_ms)
+    }
+
+    fn init(mut self) -> Result<Self, ControllerError<I2C, ATP>> {
+        // perform a soft reset
+        self.sensor.soft_reset()?;
+        self.delay_ms(10);
+
+        // update config
+
+        self.update_configuration(self.config)?;
+
         // done
 
         Ok(self)
@@ -233,7 +263,7 @@ where
     fn send_to_sleep(&mut self) -> Result<(), ControllerError<I2C, ATP>> {
         while self.sensor.get_power_mode()? != Mode::Sleep {
             self.sensor.set_power_mode(Mode::Sleep)?;
-            self.delay(10);
+            self.delay_ms(10);
         }
 
         Ok(())
@@ -282,7 +312,7 @@ where
         Ok(())
     }
 
-    pub fn get_profile_duration(&self) -> u32 {
+    pub fn get_profile_duration(&self) -> Milliseconds {
         self.profile_duration
     }
 
@@ -330,7 +360,7 @@ where
 
         // in "dump" mode, we don't initially wait, but log the internal state more often
         #[cfg(not(feature = "dump"))]
-        self.delay(self.profile_duration as u16);
+        self.delay(self.profile_duration);
 
         let mut cnt = retries as u16;
 
@@ -356,7 +386,7 @@ where
                     }
                     {
                         cnt -= 1;
-                        self.delay(delay.0 as u16);
+                        self.delay(delay);
                     }
                 }
                 Err(e) => {
