@@ -38,7 +38,14 @@ fn main() -> ! {
 }
 ~~~
 
-Also, see: [examples/](examples/)
+See: [examples/](examples/)
+
+## BSEC
+
+This crate can work together with the [Bosch Sensortec Environmental Cluster (BSEC)](https://www.bosch-sensortec.com/software-tools/software/bsec/) library.
+
+However, as the BSEC library is not open source, this crate does not include any dependencies, headers or other related
+artifacts of it. The BSEC interface is part of [drogue-bsec](https://github.com/drogue-iot/drogue-bsec).
 
 ## Run unit tests
 
