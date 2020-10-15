@@ -132,6 +132,6 @@ fn main() -> ! {
             cnt = 0;
         }
 
-        controller.delay(1_000u16);
+        controller.delay(Milliseconds(1_000));
     }
 }
