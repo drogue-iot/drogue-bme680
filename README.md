@@ -8,35 +8,35 @@
 The BME680 sensor is a "low power gas, pressure, temperature & humidity sensor" from Bosch Sensortec.
 
 This crate helps to interface with the sensor. Offering general purpose access to the sensor, as well as a more
-opinionated controller logic, simplifying the process of taking measurements. 
+opinionated controller logic, simplifying the process of taking measurements.
 
 ## More information
 
-* [BME680 product page](https://www.bosch-sensortec.com/products/environmental-sensors/gas-sensors-bme680/)
-* [C version of the driver](https://github.com/BoschSensortec/BME680_driver)
+- [BME680 product page](https://www.bosch-sensortec.com/products/environmental-sensors/gas-sensors-bme680/)
+- [C version of the driver](https://github.com/BoschSensortec/BME680_driver)
 
 ## Simple example
 
-~~~rust
+```rust
 fn main() -> ! {
-  let i2c = create_blocking_i2c();
-  let mut timer = create_timer();
-   
+  let i2c = mock::blocking_i2c();
+
   let bme680 = Bme680Sensor::from(i2c, Address::Secondary).unwrap();
-  
+  let delay = mock::MockDelay;
+
   let mut controller = Bme680Controller::new(
     bme680,
-    &mut timer,
+    delay,
     Configuration::standard(),
-    || 25,  // fixed 25 degrees Celsius as ambient temperature
+    StaticProvider(25),,  // fixed 25 degrees Celsius as ambient temperature
   ).unwrap();
-       
+
   loop {
     let result = controller.measure_default().unwrap();
     log::info!("Measured: {:?}", result);
   }
 }
-~~~
+```
 
 See: [examples/](examples/)
 
@@ -51,7 +51,7 @@ artifacts of it. The BSEC interface is part of [drogue-bsec](https://github.com/
 
 You can run the unit tests on simple host machine using:
 
-    cargo test --feature logging
+    cargo test --features env_logging test
 
 ## Run examples
 
